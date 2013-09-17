@@ -60,15 +60,31 @@ def createFileName(seperationValue, folder, isUnlabeled, fileWriter):
         
     
     
-def getScoreFromFields(row_data, score_metric_with_ids, minScore = 0):
+def getLabelFromFields(row_data, score_metric_with_ids,classification=False, ignoreLabel = False):
     keysForScore = score_metric_with_ids.keys()
     
-    maxScore = minScore
-    for field in keysForScore:
-        if row_data[field] == '1':
-            maxScore = max(maxScore,  score_metric_with_ids[field])
-            
-    return maxScore
+    if ignoreLabel:
+        label = ' '
+    else:
+        if classification:
+            label = '-1'
+            maxWeight = 0
+            for field in keysForScore:
+                if row_data[field] == '1':
+                    currentWeight = score_metric_with_ids[field]
+                    maxWeight = max(maxWeight,  currentWeight)
+                    label = '1 %d' % maxWeight
+                    
+                    
+        else:
+            maxScore = 0
+            for field in keysForScore:
+                if row_data[field] == '1':
+                    maxScore = max(maxScore,  score_metric_with_ids[field])
+                    
+            label = '%d' % maxScore
+                
+    return label
           
 def changeFieldNameToIndex(listOfFields, a_dictionary=None, a_list=None):
     
@@ -97,39 +113,41 @@ def concatAndReplaceWithNone(rowData,featureIndecies, valueToReplace):
             
     return featuresConcat
                 
-def transform2VWStream(dataFileName, dataFolder, featureFields,numericFeatureFields, ignore_value, score_metric, itemFields):
-
-    fileWriter = {}
-    (fileName, fileWriter) = createFileName('expediaVw', dataFolder, False, fileWriter) 
+def transform2VWStream(dataFileName, outputfile, featureFields,numericFeatureFields, ignore_value, score_metric, itemFields,isTest):
+    fileWriter = open(outputfile, 'w')
         
-    
-    
     with open(dataFileName, 'rb') as f:
         reader = csv.reader(f)
         headers = reader.next()
         
-        score_metric_with_ids = changeFieldNameToIndex(headers, a_dictionary=score_metric)
+        if isTest:
+            score_metric_with_ids = {}
+        else:
+            score_metric_with_ids = changeFieldNameToIndex(headers, a_dictionary=score_metric)
+            
         featureIndecies = changeFieldNameToIndex(headers, a_list=featureFields)
         itemIndecies = changeFieldNameToIndex(headers, a_list=itemFields)
         numericFeatureFieldsIndecies = changeFieldNameToIndex(headers, a_list=numericFeatureFields)
         
         for rowData in reader:
+            score = getLabelFromFields(rowData, score_metric_with_ids, classification=True, ignoreLabel=isTest)
+            
             itemId = ''
             for itemIndex in itemIndecies:
                 itemId = '%s-%s' % (itemId, rowData[itemIndex] )
             itemId = itemId[1:]
             
+            itemId = '%s-%s' % (itemId,score.replace(' ','_'))
             
             featuresConcat = concatAndReplaceWithNone(rowData,featureIndecies, ignore_value)
             numericFeaturesConcat = concatAndReplaceWithNone(rowData,numericFeatureFieldsIndecies, ignore_value)
             
-            score = getScoreFromFields(rowData, score_metric_with_ids)
+            
             outputString = writeInVwFormat(score, itemId,featuresConcat,numericFeaturesConcat, featureFields, numericFeatureFields)
                     
-            fileWriter[fileName].write('%s\n' % outputString)
+            fileWriter.write('%s\n' % outputString)
                 
-        for fileObj in fileWriter.keys():
-            fileWriter[fileObj].close()
+        fileWriter.close()
 
            
 
@@ -137,9 +155,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='create vw files')
     parser.add_argument('-i' ,'--inputfile',  type=str, default=  "small.csv" )
-    parser.add_argument('-o' ,'--outputfolder',  type=str, default=  "vwTemp" )
+    parser.add_argument('-o' ,'--outputfile',  type=str, default=  "vwTemp/small.vw" )
+    parser.add_argument('-t' ,'--test',dest='test',action='store_true', default=False)
     args = parser.parse_args()
-    
     
     #srch_id    date_time    site_id    visitor_location_country_id    visitor_hist_starrating    visitor_hist_adr_usd    prop_country_id    prop_id    prop_starrating    prop_review_score    prop_brand_bool    prop_location_score1    prop_location_score2    prop_log_historical_price    position    price_usd    promotion_flag    srch_destination_id    srch_length_of_stay    srch_booking_window    srch_adults_count    srch_children_count    srch_room_count    srch_saturday_night_bool    srch_query_affinity_score    orig_destination_distance    random_bool    comp1_rate    comp1_inv    comp1_rate_percent_diff    comp2_rate    comp2_inv    comp2_rate_percent_diff    comp3_rate    comp3_inv    comp3_rate_percent_diff    comp4_rate    comp4_inv    comp4_rate_percent_diff    comp5_rate    comp5_inv    comp5_rate_percent_diff    comp6_rate    comp6_inv    comp6_rate_percent_diff    comp7_rate    comp7_inv    comp7_rate_percent_diff    comp8_rate    comp8_inv    comp8_rate_percent_diff    click_bool    gross_bookings_usd    booking_bool
     
@@ -154,7 +172,13 @@ if __name__ == '__main__':
     score_metric = {'click_bool':1   , 'booking_bool':5} # 'gross_bookings_usd'    
     itemFields = ['srch_id' ,'prop_id']
 
-    transform2VWStream(args.inputfile, dataFolder = args.outputfolder, score_metric = score_metric,featureFields = featureFields,numericFeatureFields=numericFeatureFields,ignore_value= ignore_value,itemFields=itemFields)
+    transform2VWStream(args.inputfile, outputfile = args.outputfile, score_metric = score_metric,featureFields = featureFields,numericFeatureFields=numericFeatureFields,ignore_value= ignore_value,itemFields=itemFields, isTest= args.test)
 #    transform2VWStream(dataFileName, dataFolder = 'vwTemp', seperateByField = 'Network' ,labelField = 'Country',featureFields = featureFields, idField = 'InteractionAuthorExternalID', contentThatMarkInteraction = contentThatMarkInteraction)
     
+   #####      vw -d expediaVw.vw -p output.predictions
+   #####
+   #####            
+   #####      vw -d expediaVw.vw -c --passes 2 -f expedia.model
+   #####      vw -d expediaVw.vw --passes 2 -f expedia.model --loss_function logistic
+   #####      vw -i expedia.model -t test.vw -p test.predictions
    
