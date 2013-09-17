@@ -1,5 +1,6 @@
 train.csv
 test.csv
 vwTemp/
-data.zip
+*.zip
+*.csv
 *~

@@ -58,6 +58,62 @@ def createFileName(seperationValue, folder, isUnlabeled, fileWriter):
         
     return (fileName, fileWriter)
         
+def addFeaturesAndInteractions(featureIndecies, interactionIndecies, rowData, featuresConcat):
+    isInteraction = False
+    i = 0
+    for currentFeatureIndex in featureIndecies:
+        currentData = rowData[currentFeatureIndex]
+        if currentData in contentThatMarkInteraction:
+            currentData = ''
+            isInteraction = True
+        featuresConcat[i].append( currentData )
+        i = i+1
+    
+    if isInteraction:
+        for currentInteractionIndex in interactionIndecies:
+            currentData = rowData[currentInteractionIndex]
+            featuresConcat[i].append( currentData )
+            i = i+1
+    
+    return featuresConcat
+def getLabelAsInt(labelAsString,validLabels, labelOptions ):
+
+    if validLabels is None :
+        if labelAsString not in labelOptions:
+            labelOptions.append(labelAsString)
+        label = labelOptions.index(labelAsString)
+    else:
+        if labelAsString in validLabels:
+            label = validLabels.index(labelAsString)
+        else:
+            label = validLabels.index('Other')
+            
+    return (label, labelOptions)
+def checkForUniqueOrEmptyLabels(listOfLabels):
+    
+    uniqueLabels = list(set(listOfLabels))
+    
+    if len(uniqueLabels) == 2 and '' in uniqueLabels:
+        uniqueLabels.remove('')
+        
+    return uniqueLabels
+
+def checkForLabelUniquenessAndWriteToFile(lastLabels, lastID,featuresConcat, featuresNames, lastSeperationValue, dataFolder, fileWriter,validLabels, labelOptions):
+    uniqueLabels = checkForUniqueOrEmptyLabels(lastLabels)
+    if len(uniqueLabels) == 1:
+        theLabel =  uniqueLabels[0]
+        isUnlabeled =   theLabel == ''
+        (fileName, fileWriter) = createFileName(lastSeperationValue, dataFolder, isUnlabeled, fileWriter) 
+        (theLabel, labelOptions)  = getLabelAsInt(theLabel,validLabels, labelOptions )
+        
+        outputString = writeInVwFormat(theLabel, lastID,featuresConcat, featuresNames)
+    else:
+        (fileName, fileWriter) = createFileName('%s-multiLabelUsers' % lastSeperationValue, dataFolder, False, fileWriter) 
+        outputString =  '%s,%s' % (lastID, ','.join(uniqueLabels) ) 
+    
+    fileWriter[fileName].write('%s\n' % outputString)
+        
+    return (labelOptions, fileWriter)
     
     
 def getScoreFromFields(row_data, score_metric_with_ids, minScore = 0):
@@ -148,8 +204,6 @@ if __name__ == '__main__':
     numericFeatureFields = ['visitor_hist_starrating',   'visitor_hist_adr_usd', 'prop_starrating',    'prop_review_score',    'prop_location_score1'   , 'prop_location_score2',    'prop_log_historical_price',  'price_usd', 'orig_destination_distance', 'srch_query_affinity_score' ,'srch_booking_window', 'srch_length_of_stay','comp1_rate_percent_diff' ,'comp2_rate_percent_diff', 'comp3_rate_percent_diff','comp4_rate_percent_diff','comp5_rate_percent_diff','comp6_rate_percent_diff','comp7_rate_percent_diff','comp8_rate_percent_diff' ]
     
 
-    #featuresToPersonalize = ['prop_id','srch_destination_id']
-    
     ignore_value = 'NULL'
     score_metric = {'click_bool':1   , 'booking_bool':5} # 'gross_bookings_usd'    
     itemFields = ['srch_id' ,'prop_id']
