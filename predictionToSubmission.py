@@ -39,8 +39,11 @@ if __name__ == '__main__':
     last_search_prop = []
     last_search_relevance = []
     
-    outputFile.write('SearchId,PropertyId\n') # write header
-    
+    if args.relevance:
+        outputFile.write('SearchId,PropertyId,Relevance\n') # write header
+    else:
+        outputFile.write('SearchId,PropertyId\n') # write header
+        
     for line in inputFile:
         line = line[:-1] # remove \n at the end of line
         

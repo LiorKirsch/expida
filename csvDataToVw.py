@@ -179,6 +179,12 @@ if __name__ == '__main__':
    #####
    #####            
    #####      vw -d expediaVw.vw -c --passes 2 -f expedia.model
-   #####      vw -d expediaVw.vw --passes 2 -f expedia.model --loss_function logistic
    #####      vw -i expedia.model -t test.vw -p test.predictions
+   #####
+   #####      vw -d expediaVw.vw --passes 2 -f expedia.model --loss_function logistic
+   #####      vw -i expedia.model -t test.vw -p test.predictions --loss_function logistic
    
+   
+   
+   #####      sort -t, -k2 -T. -S 10% train.csv > sortedTrain.csv
+   #####      sort -t, -k2 -T. -S 10% test.csv > sortedTest.csv
